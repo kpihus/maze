@@ -30,7 +30,6 @@ function initialMaze() {
 	for(var r = 0; r < X; r++) {
 		maze.push([]);
 		for(var c = 0; c < Y; c++) {
-
 			var dist = 0;
 			if(r < Y / 2) {
 				if(c < X / 2) {
@@ -39,11 +38,9 @@ function initialMaze() {
 					dist = (c - 1) - r;
 				}
 			} else {
-
 				if(c < X / 2) {
 					dist = ((r - 1) - c);
 				} else {
-
 					dist = c2+r2;
 					c2++;
 					if(c2 > 7) {
@@ -161,13 +158,14 @@ where: [
  */
 function turn(where){
  var amount = (where -currDir)*90;
-	console.log(amount); //TODO: Remove
+	//TODO: add turning control here
+	console.log(amount);
 	currDir=where;
 	return true;
 }
 
 initialMaze();
-console.log(maze[5][5].nr);
+printMaze(maze);
 //printMaze(testMaze);
 //moveForward();
 //printMaze(testMaze);
