@@ -4,7 +4,7 @@ var testMaze = require('./testMaze.json');
 var X = 16;
 var Y = 16;
 var currLoc = 241;
-var currDir ='north';
+var currDir =0;
 
 var cell = {
 	nr: null,
@@ -66,6 +66,7 @@ function initialMaze() {
 
 
 function printMaze(maze) {
+	process.stdout.write('\033c');
 //var footrow="";
 	for(var r = 0; r < maze.length; r++) {
 		var row = maze[r];
@@ -76,16 +77,16 @@ function printMaze(maze) {
 			var here = " ";
 			if(currLoc == row[c].nr){
 				switch(currDir){
-					case 'north':
+					case 0:
 						here = "^";
 						break;
-					case 'south':
+					case 2:
 						here = "v";
 						break;
-					case 'east':
+					case 1:
 						here = ">";
 						break;
-					case 'west':
+					case 3:
 						here = "<";
 						break;
 				}
@@ -109,5 +110,71 @@ function printMaze(maze) {
 	console.log(footrow + '+');
 }
 
+function checkWalls(){
+	//TODO: dummy for now, data is taken from test Maze
+	for(var r=0; r<testMaze.length; r++){
+		var row = testMaze[r];
+		for(var c=0; c<row.length; c++){
+			var item=row[c];
+			if(item.nr==currLoc){
+				return {
+					north: item.north,
+					south: item.south,
+					east: item.east,
+					west: item.west
+				}
+			}
+		}
+	}
+}
+/*
+Moves forward by one cell
+And updates current location
+ */
+function moveForward(){
+	//TODO: add moving control here
+
+	switch(currDir){
+		case 0:
+			currLoc=currLoc-16;
+			break;
+		case 1:
+			currLoc=currLoc+1;
+			break;
+		case 2:
+			currLoc=currLoc+16;
+			break;
+		case 3:
+			currLoc=currLoc-1;
+			break;
+	}
+	return true;
+}
+
+/*
+where: [
+0: north,
+1: east,
+2: south,
+3: west
+]
+ */
+function turn(where){
+ var amount = (where -currDir)*90;
+	console.log(amount); //TODO: Remove
+	currDir=where;
+	return true;
+}
+
 initialMaze();
-printMaze(testMaze);
+console.log(maze[5][5].nr);
+//printMaze(testMaze);
+//moveForward();
+//printMaze(testMaze);
+//moveForward();
+//printMaze(testMaze);
+//turn(1);
+//printMaze(testMaze);
+//moveForward();
+//printMaze(testMaze);
+
