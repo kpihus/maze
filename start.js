@@ -1,7 +1,10 @@
 var maze = [];
+var testMaze = require('./testMaze.json');
 
 var X = 16;
 var Y = 16;
+var currLoc = 241;
+var currDir ='north';
 
 var cell = {
 	nr: null,
@@ -47,7 +50,6 @@ function initialMaze() {
 						c2 = 0;
 						r2++;
 					}
-
 				}
 			}
 
@@ -63,7 +65,7 @@ function initialMaze() {
 }
 
 
-function printMaze() {
+function printMaze(maze) {
 //var footrow="";
 	for(var r = 0; r < maze.length; r++) {
 		var row = maze[r];
@@ -71,11 +73,34 @@ function printMaze() {
 		var rowStr = "";
 		var footrow = "";
 		for(var c = 0; c < row.length; c++) {
-			headStr += (r == 0) ? "+----" : "+    ";
+			var here = " ";
+			if(currLoc == row[c].nr){
+				switch(currDir){
+					case 'north':
+						here = "^";
+						break;
+					case 'south':
+						here = "v";
+						break;
+					case 'east':
+						here = ">";
+						break;
+					case 'west':
+						here = "<";
+						break;
+				}
+			}
+
 			footrow += "+----";
-			rowStr += (c == 0) ? "|" : " ";
-			rowStr += (row[c].dist > 9) ? " " : "  ";
-			rowStr += row[c].dist + " ";
+			if(r == 0){
+				headStr += "+----";
+			}else{
+				headStr += (row[c].north == true && maze[r-1][c].south == true)?"+----":"+    ";
+			}
+			rowStr += (c == 0) ? "|" : "";
+			rowStr += (row[c].dist > 9) ? here : " "+here;
+			rowStr += row[c].dist;
+			rowStr += (row[c].east==true && row[c+1].west==true )?" |":"  ";
 			rowStr += (c == row.length - 1) ? "|" : "";
 		}
 		console.log(headStr + '+');
@@ -85,4 +110,4 @@ function printMaze() {
 }
 
 initialMaze();
-printMaze();
+printMaze(testMaze);
