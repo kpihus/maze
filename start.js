@@ -1,4 +1,3 @@
-
 var maze = [];
 
 var X = 16;
@@ -13,27 +12,42 @@ var cell = {
 	west: false
 };
 
-function clone(obj){	return JSON.parse(JSON.stringify(obj));}
+function clone(obj) {
+	return JSON.parse(JSON.stringify(obj));
+}
 
+/*
+I know it's an ugly function, make it better if you can :)
+ */
 function initialMaze() {
 
 	var count = 1;
+	var r2 = 0;
+	var c2 = 0;
 	for(var r = 0; r < X; r++) {
 		maze.push([]);
 		for(var c = 0; c < Y; c++) {
-			//var dist = Math.abs(X/2-r)+Math.abs(Y/2-c);
+
 			var dist = 0;
-			if(r< Y /2 ) {
+			if(r < Y / 2) {
 				if(c < X / 2) {
 					dist = ((X - 2) - c) - r;
 				} else {
 					dist = (c - 1) - r;
 				}
 			} else {
+
 				if(c < X / 2) {
-					dist = ((X - 2) - c) - r;
+					dist = ((r - 1) - c);
 				} else {
-					dist = (c - 1) - r;
+
+					dist = c2+r2;
+					c2++;
+					if(c2 > 7) {
+						c2 = 0;
+						r2++;
+					}
+
 				}
 			}
 
@@ -42,32 +56,33 @@ function initialMaze() {
 			newCell.dist = dist;
 
 			maze[r].push(newCell);
-		}
+
+		}//<- end of cell loop
+
 	}
 }
 
 
-function printMaze(){
+function printMaze() {
 //var footrow="";
-	for(var r=0; r<maze.length; r++){
+	for(var r = 0; r < maze.length; r++) {
 		var row = maze[r];
 		var headStr = "";
 		var rowStr = "";
-		var footrow="";
-		for(var c=0; c<row.length; c++){
-			headStr += (r==0)? "+----": "+    ";
+		var footrow = "";
+		for(var c = 0; c < row.length; c++) {
+			headStr += (r == 0) ? "+----" : "+    ";
 			footrow += "+----";
-			rowStr += (c==0)? "|":" ";
-			rowStr += (row[c].dist > 9) ? " ": "  ";
-			rowStr += row[c].dist+" ";
-			rowStr += (c==row.length-1)? "|":"";
+			rowStr += (c == 0) ? "|" : " ";
+			rowStr += (row[c].dist > 9) ? " " : "  ";
+			rowStr += row[c].dist + " ";
+			rowStr += (c == row.length - 1) ? "|" : "";
 		}
-		console.log(headStr+'+');
+		console.log(headStr + '+');
 		console.log(rowStr);
 	}
-	console.log(footrow+'+');
+	console.log(footrow + '+');
 }
-
 
 initialMaze();
 printMaze();
