@@ -3,7 +3,7 @@ var testMaze = require('./testMaze.json');
 
 var X = 16;
 var Y = 16;
-var currLoc = 241;
+var cl = [15,0]; //Current location
 var currDir =0;
 
 var cell = {
@@ -72,7 +72,7 @@ function printMaze(maze) {
 		var footrow = "";
 		for(var c = 0; c < row.length; c++) {
 			var here = " ";
-			if(currLoc == row[c].nr){
+			if(cl[0] == r && cl[1]==c ){
 				switch(currDir){
 					case 0:
 						here = "^";
@@ -113,7 +113,7 @@ function checkWalls(){
 		var row = testMaze[r];
 		for(var c=0; c<row.length; c++){
 			var item=row[c];
-			if(item.nr==currLoc){
+			if(item.nr==cl){
 				return {
 					north: item.north,
 					south: item.south,
@@ -133,16 +133,16 @@ function moveForward(){
 
 	switch(currDir){
 		case 0:
-			currLoc=currLoc-16;
+			cl[0]=cl[0]-1;
 			break;
 		case 1:
-			currLoc=currLoc+1;
+			cl[1]=cl[1]+1;
 			break;
 		case 2:
-			currLoc=currLoc+16;
+			cl[0]=cl[0]+1;
 			break;
 		case 3:
-			currLoc=currLoc-1;
+			cl[1]=cl[1]-1;
 			break;
 	}
 	return true;
@@ -159,20 +159,20 @@ where: [
 function turn(where){
  var amount = (where -currDir)*90;
 	//TODO: add turning control here
-	console.log(amount);
 	currDir=where;
 	return true;
 }
 
 initialMaze();
-printMaze(maze);
+//printMaze(maze);
+
 //printMaze(testMaze);
-//moveForward();
+moveForward();
 //printMaze(testMaze);
-//moveForward();
+moveForward();
 //printMaze(testMaze);
-//turn(1);
+turn(1);
 //printMaze(testMaze);
-//moveForward();
-//printMaze(testMaze);
+moveForward();
+printMaze(testMaze);
 
