@@ -1,5 +1,15 @@
+console.log('Startup'); //TODO: Remove
+try{
+	var tessel = require('tessel');
+	var isTessel = true;
+}catch(e){
+	var isTessel=false;
+}
+
+
 var maze = [];
-var testMaze = require('./testMaze.json');
+var testMaze = require('./testMaze2.json');
+
 
 var X = 16;
 var Y = 16;
@@ -49,11 +59,9 @@ function initialMaze() {
 					}
 				}
 			}
-
 			var newCell = clone(cell);
 			newCell.nr = count++;
 			newCell.dist = dist;
-
 			maze[r].push(newCell);
 
 		}//<- end of cell loop
@@ -130,20 +138,29 @@ And updates current location
  */
 function moveForward(){
 	//TODO: add moving control here
+	//Dummy timeout to emulate moving for now
+	console.log('Moving forward ...');
+	if(isTessel){
+		tessel.led[0].toggle();
+	}
 
-	switch(currDir){
-		case 0:
-			cl[0]=cl[0]-1;
-			break;
-		case 1:
-			cl[1]=cl[1]+1;
-			break;
-		case 2:
-			cl[0]=cl[0]+1;
-			break;
-		case 3:
-			cl[1]=cl[1]-1;
-			break;
+		switch(currDir){
+			case 0:
+				cl[0]=cl[0]-1;
+				break;
+			case 1:
+				cl[1]=cl[1]+1;
+				break;
+			case 2:
+				cl[0]=cl[0]+1;
+				break;
+			case 3:
+				cl[1]=cl[1]-1;
+				break;
+		}
+
+	if(isTessel){
+		tessel.led[0].toggle();
 	}
 	return true;
 }
@@ -164,15 +181,8 @@ function turn(where){
 }
 
 initialMaze();
-//printMaze(maze);
-
-//printMaze(testMaze);
-moveForward();
-//printMaze(testMaze);
-moveForward();
-//printMaze(testMaze);
-turn(1);
-//printMaze(testMaze);
-moveForward();
 printMaze(testMaze);
+
+
+
 
