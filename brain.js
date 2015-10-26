@@ -32,7 +32,7 @@ emitter.on('check_walls_done', function(){
 	if (cl[1]<X-1) maze[cl[0]][cl[1]+1].west = walls.east;
 	maze[cl[0]][cl[1]].south = walls.south;
 	if (cl[0]<X-1) maze[cl[0]+1][cl[1]].north = walls.south;
-	emitter.emit('walls_checked');
+	emitter.emit('set_walls_done');
 });
 
 emitter.on('update_cells', function(){

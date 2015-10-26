@@ -1,6 +1,6 @@
 var main = require('./start.js');
 var emitter = main.emmitter;
-var testMaze = require('./testMaze2.json');
+var testMaze = require('./testMaze.json');
 var cl = main.cl;
 var currDir = main.currDir;
 var isTessel = main.isTessel;

@@ -93,9 +93,10 @@ function initialMaze(){
 	}
 }
 
-emitter.on('print_maze', function(maze, dir){
+
+function printMaze(maze, dir){
 	process.stdout.write('\033c');
-	console.log(dir); //TODO: Remove
+	console.log(cl); //TODO: Remove
 //var footrow="";
 	for(var r = 0; r < maze.length; r++){
 		var row = maze[r];
@@ -137,40 +138,38 @@ emitter.on('print_maze', function(maze, dir){
 		console.log(rowStr);
 	}
 	console.log(footrow + '+');
+}
 
-	emitter.emit('print_done');
+emitter.on('start', function(){
+	initialMaze();
+	console.log('let the show begin'); //TODO: Remove
+	emitter.emit('set_walls');
 });
 
-	emitter.on('start', function(){
-		initialMaze();
-		console.log('let the show begin'); //TODO: Remove
+emitter.on('set_walls_done', function(){
+	emitter.emit('update_cells');
+});
+
+emitter.on('update_done', function(){
+	printMaze(maze, currDir);
+
+	emitter.emit('move_forward');
+});
+
+emitter.on('turn_done', function(){
+	emitter.emit('update_done');
+});
+
+emitter.on('moving_done', function(){
+	if(cl[0] < X / 2 - 1 || cl[0] > X / 2 || cl [1] < X / 2 - 1 || cl[1] > X / 2){
 		emitter.emit('set_walls');
-	});
-
-	emitter.on('walls_checked', function(){
-		emitter.emit('update_cells');
-	});
-
-	emitter.on('update_done', function(){
-		emitter.emit('print_maze', maze, currDir);
-
-	});
-	emitter.on('print_done', function(){
-			emitter.emit('move_forward');
-	});
-
-	emitter.on('turn_done', function(){
-		emitter.emit('update_done');
-	});
-
-	emitter.on('moving_done', function(){
-		if(cl[0] < X / 2 - 1 || cl[0] > X / 2 || cl [1] < X / 2 - 1 || cl[1] > X / 2){
-			emitter.emit('set_walls');
-		} else{
-			console.log('All done, exiting now'); //TODO: Remove
-			process.exit();
-		}
-	});
+	} else{
+		printMaze(maze, currDir);
+		console.log('Position: ' + cl); //TODO: Remove)
+		console.log('All done, exiting now'); //TODO: Remove
+		process.exit();
+	}
+});
 
 emitter.emit('start');
 
