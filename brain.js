@@ -1,6 +1,7 @@
 var main = require('./start.js');
 var emitter = main.emmitter;
 var legs = require('./legs.js');
+var steps = 0;
 var maze = main.maze;
 var X = main.X;
 var Y = main.Y;
@@ -8,6 +9,8 @@ var cl = main.cl;
 var currDir = main.currDir;
 var checkWalls = legs.checkWalls;
 var curWalls = main.curWalls;
+var whereTo = 0;
+var path = [];
 
 var worstNeighbour = {
 	nr: null,
@@ -35,219 +38,72 @@ emitter.on('check_walls_done', function(){
 	emitter.emit('set_walls_done');
 });
 
+emitter.on('calculate_distance', function(location, decideWhereTo){
+    var neighbours = [];
+    var bestNeighbour =  worstNeighbour;
+    if(location[0]>0) {neighbours.push(maze[location[0]-1][location[1]])} else {neighbours.push(worstNeighbour);}
+    if(location[1]<X-1) {neighbours.push(maze[location[0]][location[1]+1])} else {neighbours.push(worstNeighbour);}
+    if(location[0]<X-1) {neighbours.push(maze[location[0]+1][location[1]])} else {neighbours.push(worstNeighbour);}
+    if(location[1]>0) {neighbours.push(maze[location[0]][location[1]-1])} else {neighbours.push(worstNeighbour);}
+    for (var i=0; i<neighbours.length; i++){
+        var wall;
+        switch(i){
+            case 0:
+                wall = maze[location[0]][location[1]].north;
+                break;
+            case 1:
+                wall = maze[location[0]][location[1]].east;
+                break;
+            case 2:
+                wall = maze[location[0]][location[1]].south;
+                break;
+            case 3:
+                wall = maze[location[0]][location[1]].west;
+                break;
+        }
+        //console.log(wall);
+        if ((neighbours[i].dist <= bestNeighbour.dist) && (wall == false)){
+            if(decideWhereTo)whereTo = i;
+            bestNeighbour = neighbours[i];
+        }
+    }
+    //set distance to cell in location.
+    maze[location[0]][location[1]].dist = bestNeighbour.dist + 1;
+});
+
 emitter.on('update_cells', function(){
-	var neighbours = [];
-	var northNeighbours = [];
-	var eastNeighbours = [];
-	var southNeighbours = [];
-	var westNeighbours = [];
+    steps ++;
+    console.log("Step: " + steps);
+    var stable = false;
+    var currentDist;
+    var currentPathDist;
+    while(!stable){
+        stable = true;
+        currentDist = maze[cl[0]][cl[1]].dist;
 
-	if(cl[0]>0) {neighbours.push(maze[cl[0]-1][cl[1]])} else {neighbours.push(worstNeighbour);}
-	if(cl[1]<X-1) {neighbours.push(maze[cl[0]][cl[1]+1])} else {neighbours.push(worstNeighbour);}
-	if(cl[0]<X-1) {neighbours.push(maze[cl[0]+1][cl[1]])} else {neighbours.push(worstNeighbour);}
-	if(cl[1]>0) {neighbours.push(maze[cl[0]][cl[1]-1])} else {neighbours.push(worstNeighbour);}
+        //calculate distance for current location
+        emitter.emit('calculate_distance', cl, true);
+        if (currentDist != maze[cl[0]][cl[1]].dist) stable = false;
 
+        //update path distances
+        for(var i = path.length - 1; i >= 0; i--){
+            var coords = path[i];
+            currentPathDist = maze[coords[0]][coords[1]].dist;
+            emitter.emit('calculate_distance', path[i], false);
 
-	//calculate distance for current location
-	//console.log(neighbours);
-	var bestNeighbour =  worstNeighbour;
-	//var whereTo = 0;
-	for (var i=0; i<neighbours.length; i++){
-		var wall;
-		switch(i){
-			case 0:
-				wall = maze[cl[0]][cl[1]].north;
-				break;
-			case 1:
-				wall = maze[cl[0]][cl[1]].east;
-				break;
-			case 2:
-				wall = maze[cl[0]][cl[1]].south;
-				break;
-			case 3:
-				wall = maze[cl[0]][cl[1]].west;
-				break;
-		}
-		//console.log(wall);
-		if ((neighbours[i].dist <= bestNeighbour.dist) && (wall == false)){
+            if (currentPathDist != maze[coords[0]][coords[1]].dist){
+                stable = false;
+            }
+        }
 
-			bestNeighbour = neighbours[i];
-		}
-	}
-	//set distance to current location
-	maze[cl[0]][cl[1]].dist = bestNeighbour.dist + 1;
+    }
 
-	//calculate distance of northern neighbour
-	if(cl[0]>0) {
-		//get neighbours of northern neighbour
-		if(cl[0]>1) {northNeighbours.push(maze[cl[0]-2][cl[1]])} else {northNeighbours.push(worstNeighbour);}
-		if(cl[1]<X-1) {northNeighbours.push(maze[cl[0]-1][cl[1]+1])} else {northNeighbours.push(worstNeighbour);}
-		northNeighbours.push(maze[cl[0]][cl[1]]);
-		if(cl[1]>0) {northNeighbours.push(maze[cl[0]-1][cl[1]-1])} else {northNeighbours.push(worstNeighbour);}
-
-		//find the best neighbour
-		var bestNeighbour = worstNeighbour;
-		for (var i=0; i<northNeighbours.length; i++){
-			var wall;
-			switch(i){
-				case 0:
-					wall = maze[cl[0]-1][cl[1]].north;
-					break;
-				case 1:
-					wall = maze[cl[0]-1][cl[1]].east;
-					break;
-				case 2:
-					wall = maze[cl[0]-1][cl[1]].south;
-					break;
-				case 3:
-					wall = maze[cl[0]-1][cl[1]].west;
-					break;
-			}
-			if ((northNeighbours[i].dist < bestNeighbour.dist) && wall == false){
-				bestNeighbour = northNeighbours[i];
-			}
-		}
-		//set distance to northern neighbour
-		//maze[cl[0]-1][cl[1]].dist = bestNeighbour.dist + 1;
-		neighbours[0].dist = bestNeighbour.dist + 1;
-	}
-
-	//calculate distance of eastern neighbour
-	if(cl[1]<X-1) {
-		//get neighbours of eastern neighbour
-		if(cl[0]>0) {eastNeighbours.push(maze[cl[0]-1][cl[1]+1])} else {eastNeighbours.push(worstNeighbour);}
-		if(cl[1]<X-2) {eastNeighbours.push(maze[cl[0]][cl[1]+2])} else {eastNeighbours.push(worstNeighbour);}
-		if(cl[0]<X-1) {eastNeighbours.push(maze[cl[0]+1][cl[1]+1])} else {eastNeighbours.push(worstNeighbour);}
-		eastNeighbours.push(maze[cl[0]][cl[1]]);
-
-		//find the best neighbour
-		var bestNeighbour = worstNeighbour;
-		for (var i=0; i<eastNeighbours.length; i++){
-			var wall;
-			switch(i){
-				case 0:
-					wall = maze[cl[0]][cl[1]+1].north;
-					break;
-				case 1:
-					wall = maze[cl[0]][cl[1]+1].east;
-					break;
-				case 2:
-					wall = maze[cl[0]][cl[1]+1].south;
-					break;
-				case 3:
-					wall = maze[cl[0]][cl[1]+1].west;
-					break;
-			}
-			if ((eastNeighbours[i].dist < bestNeighbour.dist) && wall == false){
-				bestNeighbour = eastNeighbours[i];
-			}
-		}
-		//set distance to eastern neighbour
-		//maze[cl[0]][cl[1]+1].dist = bestNeighbour.dist + 1;
-		neighbours[1].dist = bestNeighbour.dist + 1;
-	}
-
-	//calculate distance of southern neighbour
-	if(cl[0]<X-1) {
-		//get neighbours of southern neighbour
-		southNeighbours.push(maze[cl[0]][cl[1]]);
-		if(cl[1]<X-1) {southNeighbours.push(maze[cl[0]+1][cl[1]+1])} else {southNeighbours.push(worstNeighbour);}
-		if(cl[0]<X-2) {southNeighbours.push(maze[cl[0]+2][cl[1]])} else {southNeighbours.push(worstNeighbour);}
-		if(cl[1]>0) {southNeighbours.push(maze[cl[0]+1][cl[1]-1])} else {southNeighbours.push(worstNeighbour);}
-
-		//find the best neighbour
-		var bestNeighbour = worstNeighbour;
-		for (var i=0; i<southNeighbours.length; i++){
-			var wall;
-			switch(i){
-				case 0:
-					wall = maze[cl[0]+1][cl[1]].north;
-					break;
-				case 1:
-					wall = maze[cl[0]+1][cl[1]].east;
-					break;
-				case 2:
-					wall = maze[cl[0]+1][cl[1]].south;
-					break;
-				case 3:
-					wall = maze[cl[0]+1][cl[1]].west;
-					break;
-			}
-			if ((southNeighbours[i].dist < bestNeighbour.dist) && wall == false){
-				bestNeighbour = southNeighbours[i];
-			}
-		}
-		//set distance to southern neighbour
-		//maze[cl[0]+1][cl[1]].dist = bestNeighbour.dist + 1;
-		neighbours[2].dist = bestNeighbour.dist + 1;
-	}
-
-	//calculate distance of western neighbour
-	if(cl[1]>0) {
-		//get neighbours of western neighbour
-
-		if(cl[0]>0) {westNeighbours.push(maze[cl[0]-1][cl[1]-1])} else {westNeighbours.push(worstNeighbour);}
-		westNeighbours.push(maze[cl[0]][cl[1]]);
-		if(cl[0]<X-1) {westNeighbours.push(maze[cl[0]+1][cl[1]-1])} else {westNeighbours.push(worstNeighbour);}
-		if(cl[1]>1) {westNeighbours.push(maze[cl[0]][cl[1]-2])} else {westNeighbours.push(worstNeighbour);}
-
-		//find the best neighbour
-		var bestNeighbour = worstNeighbour;
-		for (var i=0; i<westNeighbours.length; i++){
-			var wall;
-			switch(i){
-				case 0:
-					wall = maze[cl[0]][cl[1]-1].north;
-					break;
-				case 1:
-					wall = maze[cl[0]][cl[1]-1].east;
-					break;
-				case 2:
-					wall = maze[cl[0]][cl[1]-1].south;
-					break;
-				case 3:
-					wall = maze[cl[0]][cl[1]-1].west;
-					break;
-			}
-			if ((westNeighbours[i].dist < bestNeighbour.dist) && wall == false){
-				bestNeighbour = westNeighbours[i];
-			}
-		}
-		//set distance to western neighbour
-		//maze[cl[0]][cl[1]-1].dist = bestNeighbour.dist + 1;
-		neighbours[3].dist = bestNeighbour.dist + 1;
-	}
-
-	//calculate distance for current location
-	//console.log(neighbours);
-	var bestNeighbour =  worstNeighbour;
-	var whereTo = 0;
-	for (var i=0; i<neighbours.length; i++){
-		var wall;
-		switch(i){
-			case 0:
-				wall = maze[cl[0]][cl[1]].north;
-				break;
-			case 1:
-				wall = maze[cl[0]][cl[1]].east;
-				break;
-			case 2:
-				wall = maze[cl[0]][cl[1]].south;
-				break;
-			case 3:
-				wall = maze[cl[0]][cl[1]].west;
-				break;
-		}
-		//console.log(wall);
-		if ((neighbours[i].dist <= bestNeighbour.dist) && (wall == false)){
-
-			bestNeighbour = neighbours[i];
-			whereTo = i;
-		}
-	}
-	//set distance to current location
-	maze[cl[0]][cl[1]].dist = bestNeighbour.dist + 1;
-
+    var beenHere = false;
+    for(var n = 0; n < path.length; n++){
+        var coords = path[n];
+        if(coords[0] == cl[0] && coords[1] == cl[1]) beenHere = true;
+    }
+    if(!beenHere) path.push([cl[0],cl[1]]);
 
 	emitter.emit('turn', whereTo);
 
