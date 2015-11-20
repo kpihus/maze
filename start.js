@@ -4,15 +4,28 @@ var events = require('events');
 try{
 	var tessel = require('tessel');
 	var isTessel = true;
+	exports.tessel = tessel;
 } catch(e){
 	var isTessel = false;
 }
+
+if(isTessel){
+	var led1 = tessel.led[0].output(1);
+	var led2 = tessel.led[1].output(0);
+	setInterval(function(){
+		//General heartbeat
+		led1.toggle();
+	}, 200);
+}
+var workingHB;
+
 var emitter = new events.EventEmitter();
 exports.emmitter = emitter;
 exports.isTessel = isTessel;
 
 var maze = [];
-exports.maze = maze;
+
+
 
 var X = 16;
 var Y = 16;
@@ -42,7 +55,8 @@ var cell = {
 };
 
 //var comm = require('./comm.js');
-var brain = require('./brain.js');
+var brain = require('./brain');
+var legs = require('./legs.js');
 
 function clone(obj){
 	return JSON.parse(JSON.stringify(obj));
@@ -53,11 +67,16 @@ exports.setDir = function(where){
 exports.getDir = function(){
 	return currDir;
 };
+exports.setCl = function(r, c){
+	cl[0] = r;
+	cl[1] = c;
+};
 
 /*
  I know it's an ugly function, make it better if you can :)
  */
 function initialMaze(){
+	maze = [];
 	var count = 1;
 	var r2 = 0;
 	var c2 = 0;
@@ -91,8 +110,9 @@ function initialMaze(){
 		}//<- end of cell loop
 
 	}
-}
 
+	exports.maze = maze;
+}
 
 function printMaze(maze, dir){
 	process.stdout.write('\033c');
@@ -142,6 +162,7 @@ function printMaze(maze, dir){
 
 emitter.on('start', function(){
 	initialMaze();
+	printMaze(maze, currDir);
 	console.log('let the show begin'); //TODO: Remove
 	emitter.emit('set_walls');
 });
@@ -164,14 +185,43 @@ emitter.on('moving_done', function(){
 	if(cl[0] < X / 2 - 1 || cl[0] > X / 2 || cl [1] < X / 2 - 1 || cl[1] > X / 2){
 		emitter.emit('set_walls');
 	} else{
+		emitter.emit('all_done');
 		printMaze(maze, currDir);
 		console.log('Position: ' + cl); //TODO: Remove)
-		console.log('All done, exiting now'); //TODO: Remove
-		process.exit();
+		if(isTessel){
+			console.log('All done, waiting for new start'); //TODO: Remove
+		} else{
+			console.log('All done, exit');
+			process.exit();
+		}
 	}
 });
 
-emitter.emit('start');
+emitter.on('start', function(){
+	workingHB = setInterval(function(){
+		//Working heartbeat
+		if(led2){
+			led2.toggle();
+		}
+	}, 200)
+});
+emitter.on('all_done', function(){
+	clearInterval(workingHB);
+	if(isTessel){
+		//led2.off();
+	}
+});
+
+if(isTessel){
+	console.log('Press button to start'); //TODO: Remove
+	tessel.button.on('press', function(time){
+		console.log('The button was pressed!, starting Up', time);
+		exports.setCl(15, 0);
+		emitter.emit('start');
+	});
+} else{
+	emitter.emit('start');
+}
 
 //initialMaze();
 //printMaze(testMaze);
