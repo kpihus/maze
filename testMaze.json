@@ -33,7 +33,7 @@
     {      "nr": 29,      "dist": 10,      "north": true,      "south": true,      "east": false,      "west": false    },
     {      "nr": 30,      "dist": 11,      "north": true,      "south": true,      "east": false,      "west": false    },
     {      "nr": 31,      "dist": 12,      "north": true,      "south": true,      "east": false,      "west": false    },
-    {      "nr": 32,      "dist": 13,      "north": false,      "south": true,      "east": false,      "west": false    }
+    {      "nr": 32,      "dist": 13,      "north": false,      "south": false,      "east": false,      "west": false    }
   ],
   [
     {      "nr": 33,      "dist": 12,      "north": false,      "south": true,      "east": false,      "west": false    },
