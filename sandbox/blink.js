@@ -15,10 +15,10 @@ var pin2 = tessel.port['C'].digital[0];
 var p1c = 0;
 var p2c = 0;
 
-pin1.on('rise', function(time, type){
+pin1.on('change', function(time, type){
 	console.log('P1: ', p1c++); //TODO: Remove
 });
-pin2.on('rise', function(time, type){
+pin2.on('change', function(time, type){
 	console.log('P2: ', p2c++); //TODO: Remove
 });
 

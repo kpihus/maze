@@ -21,6 +21,11 @@ var worstNeighbour = {
 	west: false
 };
 
+//var maze2 = function(emitter){
+//
+//};
+//exports.maze = maze2;
+
 emitter.on('set_walls', function(){
 	emitter.emit('check_walls');
 	});

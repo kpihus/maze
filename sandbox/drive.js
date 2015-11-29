@@ -5,70 +5,76 @@ var port = tessel.port['D'];
 var uart = new port.UART({
 	baudrate: 115200
 });
-
+uart.write(new Buffer([0xB7]));
 var speed = 20;
-
+var encReading = 0;
 var leftCount = 0;
 var rightCount = 0;
+var totalError = 0;
+var lastError = 0;
 
 var rightMotor = 0xC6;
 var leftMotor = 0xC2;
 
-var rightEnc = tessel.port['A'].digital[0];
-var leftEnc = tessel.port['C'].digital[0];
 
-leftEnc.on('rise', function(time, type){
-	leftCount++;
-	//equalDrive();
+var encSend = 0;
+var lineFree = true;
 
-});
-
-rightEnc.on('rise', function(time, type){
-	rightCount++;
-	//equalDrive();
-});
-
-function equalDrive(){
-	if(leftCount !== rightCount){
-		emitter.emit('correct');
+setInterval(function(){
+	if(lineFree){
+		lineFree = false;
+		encSend++;
+		uart.write(new Buffer([0xB7]));
 	}
-}
 
-//uart.write(new Buffer([0x81]));
-
-//uart.write(new Buffer([rightMotor, speed.toString(16)]));
-//uart.write(new Buffer([leftMotor, speed.toString(16)]));
+}, 50);
 
 uart.on('data', function(data){
-	console.log('received:', data);
+	console.log(encReading); //TODO: Remove
+	encSend--;
+	if(data.readInt16LE(0) == 69){
+		if(encReading > 5){
+			leftCount += -data.readInt16LE(2);
+			rightCount += data.readInt16LE(4);
+			adjust();
+		} else{
+			encReading++;
+			lineFree =true;
+		}
+	}
 });
-function setSpeeds(left, right){
-	console.log('setSpeed'); //TODO: Remove
-	uart.write(new Buffer([rightMotor, right]));
-	uart.write(new Buffer([leftMotor, left]));
-	console.log('speed Set'); //TODO: Remove
-}
 
-//setSpeeds(40, 40);
-setInterval(function(){
+function adjust(){
+	console.log('adjust'); //TODO: Remove
+	Kp = 0.01;
+	Ki = 0;
+	Kd = 0;
+
 	var diff = leftCount - rightCount;
 	var speedLeft = speed;
 	var speedRight = speed;
 
-	if(diff > 0){
-		speedLeft = speed - diff;
-		speedRight = speed + diff;
-	}
-	if(diff < 0){
-		speedLeft = speed + diff;
-		speedRight = speed - diff;
-	}
+	totalError += diff;
+	var dError = diff - lastError;
 
-	console.log(diff, ' ::: ', speedLeft, ' ---- ', speedRight); //TODO: Remove
-	setSpeeds(speedLeft, speedRight);
-	leftCount = 0;
-	rightCount = 0;
-}, 100);
+	var adjust = Kp * diff + Ki * totalError + Kd * dError;
+	speedLeft -= Math.floor(adjust);
+	speedRight += Math.floor(adjust);
+	lastError = diff;
+
+	console.log(diff, adjust, speedLeft, speedRight, totalError, dError); //TODO: Remove
+
+	uart.write(new Buffer([rightMotor, speedRight]));
+	uart.write(new Buffer([leftMotor, speedLeft]));
+	lineFree = true;
+}
+
+setTimeout(function(){
+	setTimeout(function(){
+		process.exit();
+	}, 500)
+}, 15000);
+
 
 
 

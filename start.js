@@ -1,22 +1,15 @@
 console.log('Startup'); //TODO: Remove
 var events = require('events');
+var tessel, isTessel, go;
 
 try{
-	var tessel = require('tessel');
-	var isTessel = true;
+	tessel = require('tessel');
+	isTessel = true;
 	exports.tessel = tessel;
 } catch(e){
-	var isTessel = false;
+	isTessel = false;
 }
 
-if(isTessel){
-	var led1 = tessel.led[0].output(1);
-	var led2 = tessel.led[1].output(0);
-	setInterval(function(){
-		//General heartbeat
-		led1.toggle();
-	}, 200);
-}
 var workingHB;
 
 var emitter = new events.EventEmitter();
@@ -57,6 +50,10 @@ var cell = {
 //var comm = require('./comm.js');
 var brain = require('./brain');
 var legs = require('./legs.js');
+
+go = new legs.motor(tessel, emitter);
+//maze = new brain.maze(emitter, motor);
+
 
 function clone(obj){
 	return JSON.parse(JSON.stringify(obj));
@@ -198,37 +195,39 @@ emitter.on('moving_done', function(){
 });
 
 emitter.on('start', function(){
-	workingHB = setInterval(function(){
-		//Working heartbeat
-		if(led2){
-			led2.toggle();
-		}
-	}, 200)
+
 });
+
 emitter.on('all_done', function(){
-	clearInterval(workingHB);
-	if(isTessel){
-		//led2.off();
-	}
+
+});
+
+
+emitter.on('test_drive', function(){
+	go.startMoving();
+});
+
+emitter.on('stop_moving', function(){
+	go.stopMoving();
+});
+
+emitter.on('turn', function(where){
+	go.turn(where);
 });
 
 if(isTessel){
 	console.log('Press button to start'); //TODO: Remove
 	tessel.button.on('press', function(time){
-		console.log('The button was pressed!, starting Up', time);
+		console.log('The button was pressed!, starting Up');
 		exports.setCl(15, 0);
-		emitter.emit('start');
+
+		setTimeout(function(){
+			emitter.emit('test_drive'); //TODO: REMOVE
+			//emitter.emit('start');
+		},500);
+
 	});
 } else{
 	emitter.emit('start');
 }
 
-//initialMaze();
-//printMaze(testMaze);
-//printMaze(maze);
-
-//while (){
-//    setWalls();
-//    updateCells();
-//}
-//printMaze(maze);

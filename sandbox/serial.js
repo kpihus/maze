@@ -4,38 +4,30 @@ var uart = new port.UART({
 	baudrate: 115200
 });
 
-uart.write(new Buffer([0xB1]));
+var leftEncoder = 0;
+var rightEncoder = 0;
 
 
+//uart.write(new Buffer([0xB7]));
 
-var speed = 50;
-var stop=0;
-var right = 0xC6;
-var left = 0xC2;
 
 setInterval(function(){
-	speed--;
-	var hSpee = speed.toString(16);
-	console.log(hSpee); //TODO: Remove
-	uart.write(new Buffer([right, speed]));
-	//uart.write(new Buffer([left, speed.toString(16)]));
-	if(speed <0){
-		uart.write(new Buffer([right, 0x0]));
-		//uart.write(new Buffer([left, 0x0]));
-		setTimeout(function(){
-			process.exit();
-		},500);
-	}
-},1000);
+	uart.write(new Buffer([0xB7]));
+}, 50);
 
-
+setInterval(function(){
+	console.log(leftEncoder, rightEncoder); //TODO: Remove
+},100);
 
 
 
 uart.on('data', function (data) {
-	console.log('received:', data);
-});
+	//console.log('received:',data, data.readInt16LE(0),, );
+	var encoders = {
+		left: data.readInt16LE(2),
+		right: data.readInt16LE(4)
+	};
 
-// UART objects are streams!
-// pipe all incoming data to stdout:
-uart.pipe(process.stdout);
+	leftEncoder = leftEncoder + -encoders.left;
+	rightEncoder = rightEncoder + encoders.right;
+});

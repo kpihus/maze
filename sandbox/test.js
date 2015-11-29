@@ -1,12 +1,11 @@
-var events = require('events');
-var eventEmitter = new events.EventEmitter();
+var intid;
+var start = new Date().getTime();
+intid = setInterval(function(){
+	//console.log('Running');
+}, 2);
 
-var ringBell = function ringBell()
-{
-	console.log('ring ring ring');
-}
-eventEmitter.on('doorOpen', ringBell);
-
-eventEmitter.emit('doorOpen');/**
- * Created by kpihus on 26/10/15.
- */
+setTimeout(function(){
+	//console.log('STOP');
+	setImmediate(clearInterval(intid));
+	console.log('END', new Date().getTime() - start);
+}, 500);
