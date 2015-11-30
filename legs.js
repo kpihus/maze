@@ -147,16 +147,45 @@ var motor = function(tessel, emitter){
 
 	};
 
-	self.turn = function(where){
-		//TODO: Implement code here
-		//One wheel rotation == 82 encoder counts
-		//For a 360deg turn, wheel has to drive 283mm
-		//For a 90deg turn, wheel has to drive 71mm
-		//One wheel rotation is 100mm
-		//For a 90deg, we need 58 odo ticks
-		//NB based on calcultions, actual may be different
+    self.turn = function (where) {
+        //TODO: Implement code here
+        //One wheel rotation == 360 encoder counts
+        //For a 360deg turn, wheel has to drive 283mm
+        //For a 90deg turn, wheel has to drive 71mm
+        //One wheel rotation is 100mm
+        //For a 90deg, we need 256 odo ticks
+        //NB based on calculations, actual may be different
 
-	};
+        self.turnTo = function (leftCommand, rightCommand, numberOfCounts) {
+            var turnSpeed = self.speed / 2;
+            self.leftCount = 0;
+            self.rightCount = 0;
+
+            while (rightCount < numberOfCounts || leftCount < numberOfCounts) {
+                self.uart.write(new Buffer([rightCommand, turnSpeed]));
+                self.uart.write(new Buffer([leftCommand, turnSpeed]));
+            }
+
+            self.setSpeeds(0, 0);
+            self.leftCount = 0;
+            self.rightCount = 0;
+        };
+
+        var direction = main.currDir;
+        var turning = direction - where;
+        var ninetyDegreeClicks = 256;
+
+        if (turning == 1 || turning == -3) {
+            self.turnTo(self.leftBackwards, self.rightForward, ninetyDegreeClicks);
+        } else if (turning == -1 || turning == 3) {
+            self.turnTo(self.leftForward, self.rightBackwards, ninetyDegreeClicks);
+        } else if (turning == -2 || turning == 2) {
+            self.turnTo(self.leftForward, self.rightBackwards, 2*ninetyDegreeClicks);
+        }
+
+        main.setDir(where);
+
+    };
 
 	self.readWalls = function(callback){
 
