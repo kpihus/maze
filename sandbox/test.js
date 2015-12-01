@@ -1,11 +1,8 @@
-var intid;
-var start = new Date().getTime();
-intid = setInterval(function(){
-	//console.log('Running');
-}, 2);
+var distMin = 50;
+var distMax = 750;
+var coefMin = 0;
+var coefMax = 100;
+var distAct = 50;
 
-setTimeout(function(){
-	//console.log('STOP');
-	setImmediate(clearInterval(intid));
-	console.log('END', new Date().getTime() - start);
-}, 500);
+var speedCoef = coefMin+(coefMax-coefMin)*((distAct-distMin)/(distMax-distMin));
+console.log(speedCoef); //TODO: Remove

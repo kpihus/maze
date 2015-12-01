@@ -15,9 +15,9 @@ var motor = function(tessel, emitter){
 	var led = tessel.led[0];
 	var port = tessel.port['D'];
 	var gpio = tessel.port['GPIO'];
-	var leftSens = gpio.analog[1];
-	var frontSens = gpio.analog[2];
-	var rightSens = gpio.analog[3];
+	var leftSens = gpio.analog[0];
+	var frontSens = gpio.analog[4];
+	var rightSens = gpio.analog[5];
 	var uart = new port.UART({
 		baudrate: 115200
 	});
@@ -35,7 +35,17 @@ var motor = function(tessel, emitter){
 	var startTime, endTime;
 
 	//...
-	self.speed = 10; //Master speed
+
+	self.masterSpeed = 20; //Master speed
+	self.speed = self.masterSpeed; //Will be changed according to front wall
+
+	function map(inmin, inmax, outmin, outmax, value){
+		var coef = Math.floor((value - inmin) * (outmax - outmin) / (inmax - inmin) + outmin);
+		coef = (coef<outmin) ? outmin : coef;
+		coef = (coef>outmax) ? outmax : coef;
+		return coef;
+	}
+
 	self.leftCount = 0;
 	self.rightCount = 0;
 	self.odo = 0;
@@ -73,6 +83,21 @@ var motor = function(tessel, emitter){
 		lineFree = true;
 	};
 
+	function calculateSpeedcoef(walls){
+		var distMin = 50;
+		var distMax = 750;
+		var coefMin = 0;
+		var coefMax = 100;
+		var distAct = walls.front;
+
+		var speedCoef = coefMin+(coefMax-coefMin)*((distAct-distMin)/(distMax-distMin));
+
+		//var speedCoef = map(50, 750,0,100, walls.front);
+		var base = (walls.front>50)?self.masterSpeed-10:self.masterSpeed;
+
+		self.speed = base-(base/100*speedCoef);
+	}
+
 	/**
 	 * Starting moving forward
 	 */
@@ -81,7 +106,8 @@ var motor = function(tessel, emitter){
 		encoderInterval = setInterval(function(){
 			led.toggle();
 			self.readWalls(function(walls){
-				if(walls.front>500){
+				calculateSpeedcoef(walls);
+				if(walls.front>750){
 					process.nextTick(self.stopMoving());
 				}
 				if(lineFree){
