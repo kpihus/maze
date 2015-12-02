@@ -31,26 +31,19 @@ var motor = function(tessel, emitter){
 	var lastError = 0;
 	var totalError = 0;
 	var lineFree = true;
-	var moving = false;
-	var startTime, endTime;
+	var moving = false; //Moving forward
+	var turning = false; //Turning
 
 	//...
 
 	self.masterSpeed = 20; //Master speed
 	self.speed = self.masterSpeed; //Will be changed according to front wall
 
-	function map(inmin, inmax, outmin, outmax, value){
-		var coef = Math.floor((value - inmin) * (outmax - outmin) / (inmax - inmin) + outmin);
-		coef = (coef<outmin) ? outmin : coef;
-		coef = (coef>outmax) ? outmax : coef;
-		return coef;
-	}
-
 	self.leftCount = 0;
 	self.rightCount = 0;
 	self.odo = 0;
-	//Moving commands
 
+	//Moving commands
 	var rightForward = 0xC6;
 	var leftForward = 0xC2;
 	var rightBackwards = 0xC5;
@@ -65,12 +58,18 @@ var motor = function(tessel, emitter){
 
 	uart.on('data', function(data){
 		if(data.readInt16LE(0) == 69){
-			if(encNo > 5 && moving){
-				lineFree = true;
-				self.leftCount += -data.readInt16LE(2);
-				self.rightCount += data.readInt16LE(4);
-				self.odo += Math.round((-data.readInt16LE(2) + data.readInt16LE(4)) / 2);
-				self.adjustMotors();
+			if(encNo > 2 && moving){ //First encoder reading contains legacy values, ingore those
+				if(moving){
+					lineFree = true;
+					self.leftCount += -data.readInt16LE(2);
+					self.rightCount += data.readInt16LE(4);
+					self.odo += Math.round((-data.readInt16LE(2) + data.readInt16LE(4)) / 2);
+					self.adjustMotors();
+				} else if(turning){
+					self.leftCount += -data.readInt16LE(2);
+					self.rightCount += data.readInt16LE(4);
+					checkTurn();
+				}
 			} else{
 				encNo++;
 				lineFree = true;
@@ -83,19 +82,17 @@ var motor = function(tessel, emitter){
 		lineFree = true;
 	};
 
+	/**
+	 * Slow down if wall ahead is detected
+	 * @param walls
+	 */
 	function calculateSpeedcoef(walls){
-		var distMin = 50;
-		var distMax = 750;
-		var coefMin = 0;
-		var coefMax = 100;
-		var distAct = walls.front;
+		var adjust = Math.floor(Math.sqrt(14.3 * walls.front - 720));
 
-		var speedCoef = coefMin+(coefMax-coefMin)*((distAct-distMin)/(distMax-distMin));
-
-		//var speedCoef = map(50, 750,0,100, walls.front);
-		var base = (walls.front>50)?self.masterSpeed-10:self.masterSpeed;
-
-		self.speed = base-(base/100*speedCoef);
+		if(moving){
+			self.speed = (isNaN(adjust)) ? 20 : self.masterSpeed - (self.masterSpeed / 100 * adjust);
+		}
+		//console.log(walls.front,adjust, self.speed); //TODO: Remove
 	}
 
 	/**
@@ -107,7 +104,7 @@ var motor = function(tessel, emitter){
 			led.toggle();
 			self.readWalls(function(walls){
 				calculateSpeedcoef(walls);
-				if(walls.front>750){
+				if(walls.front > 750 && moving){
 					process.nextTick(self.stopMoving());
 				}
 				if(lineFree){
@@ -116,22 +113,7 @@ var motor = function(tessel, emitter){
 				}
 			});
 
-		}, 11);
-	};
-
-	self.checkWalls = function(){
-		wallInterval = setInterval(function(){
-			self.checkWalls(function(walls){
-				self.walls = walls;
-				if(walls.front > 550){
-					//We have a wall ahead, stop motors.
-
-					process.nextTick(function(){
-						self.stopMoving();
-					});
-				}
-			});
-		}, 10);
+		}, 15);
 	};
 
 	self.adjustMotors = function(){
@@ -168,50 +150,62 @@ var motor = function(tessel, emitter){
 	};
 	self.stopMoving = function(){
 		moving = false;
-			clearInterval(encoderInterval);
-			self.setSpeeds(0, 0);
+		clearInterval(encoderInterval);
+		self.setSpeeds(0, 0);
 
 	};
 
-    self.turn = function (where) {
-        //TODO: Implement code here
-        //One wheel rotation == 360 encoder counts
-        //For a 360deg turn, wheel has to drive 283mm
-        //For a 90deg turn, wheel has to drive 71mm
-        //One wheel rotation is 100mm
-        //For a 90deg, we need 256 odo ticks
-        //NB based on calculations, actual may be different
+	//Turn handling
+	var leftGoal = 0;
+	var rightGoal = 0;
 
-        self.turnTo = function (leftCommand, rightCommand, numberOfCounts) {
-            var turnSpeed = self.speed / 2;
-            self.leftCount = 0;
-            self.rightCount = 0;
+	var checkTurn = function(){
+		if(leftCount>= leftGoal || rightCount >= rightGoal){
+			turning = false;
+			self.setSpeeds(0, 0);
+			clearInterval(encoderInterval);
+			self.leftCount = 0;
+			self.rightCount = 0;
+		}
+	};
 
-            while (rightCount < numberOfCounts || leftCount < numberOfCounts) {
-                self.uart.write(new Buffer([rightCommand, turnSpeed]));
-                self.uart.write(new Buffer([leftCommand, turnSpeed]));
-            }
+	self.turn = function(where){
+		encNo = 0;
+		turning = true;
+		//TODO: Implement code here
+		//One wheel rotation == 360 encoder counts
+		//For a 360deg turn, wheel has to drive 283mm
+		//For a 90deg turn, wheel has to drive 71mm
+		//One wheel rotation is 100mm
+		//For a 90deg, we need 256 odo ticks
+		//NB based on calculations, actual may be different
 
-            self.setSpeeds(0, 0);
-            self.leftCount = 0;
-            self.rightCount = 0;
-        };
+		self.turnTo = function(leftCommand, rightCommand, numberOfCounts){
+			leftGoal = numberOfCounts;
+			rightGoal = numberOfCounts;
+			var turnSpeed = self.speed / 2;
+			self.leftCount = 0;
+			self.rightCount = 0;
+			self.startEncoders();
+			self.uart.write(new Buffer([rightCommand, turnSpeed]));
+			self.uart.write(new Buffer([leftCommand, turnSpeed]));
+		};
 
-        var direction = main.currDir;
-        var turning = direction - where;
-        var ninetyDegreeClicks = 256;
+		var direction = main.currDir;
+		var turning = direction - where;
+		var ninetyDegreeClicks = 256;
 
-        if (turning == 1 || turning == -3) {
-            self.turnTo(self.leftBackwards, self.rightForward, ninetyDegreeClicks);
-        } else if (turning == -1 || turning == 3) {
-            self.turnTo(self.leftForward, self.rightBackwards, ninetyDegreeClicks);
-        } else if (turning == -2 || turning == 2) {
-            self.turnTo(self.leftForward, self.rightBackwards, 2*ninetyDegreeClicks);
-        }
+		if(turning == 1 || turning == -3){
+			self.turnTo(self.leftBackwards, self.rightForward, ninetyDegreeClicks);
+		} else if(turning == -1 || turning == 3){
+			self.turnTo(self.leftForward, self.rightBackwards, ninetyDegreeClicks);
+		} else if(turning == -2 || turning == 2){
+			self.turnTo(self.leftForward, self.rightBackwards, 2 * ninetyDegreeClicks);
+		}
 
-        main.setDir(where);
+		main.setDir(where);
 
-    };
+	};
 
 	self.readWalls = function(callback){
 
@@ -231,12 +225,6 @@ var motor = function(tessel, emitter){
 		});
 
 	};
-
-	//Emitter listeners
-
-
-
-
 
 };
 
