@@ -66,6 +66,10 @@ var brain = function(emitter) {
 		west: false
 	};
 
+	self.calc = function(callback){
+		callback(true);
+	};
+
 	var checkWalls = function() {
 		go.readWalls(function(walls) {
 			maze[cl[0]][cl[1]].north = walls.north;

@@ -9,10 +9,10 @@ var leftCount = 0;
 var rightCount = 0;
 exports.testMaze = testMaze;
 
-var motor = function(tessel, emitter){
+var motor = function(tessel, emitter) {
 	var self = this;
 	var maze;
-	self.setMaze = function(m){
+	self.setMaze = function(m) {
 		maze = m;
 	};
 	//Hardware variables
@@ -25,13 +25,15 @@ var motor = function(tessel, emitter){
 	var uart = new port.UART({
 		baudrate: 250000
 	});
+
+	var sendSerial = process.binding('hw').uart_send;
+
 	//Initialize 3pi
 	uart.write(new Buffer([0x81]));
 	//Clear encoders in 3pi
 	uart.write(new Buffer([0xB7]));
 
 	//Inhouse usage variables
-	var wallInterval = 0;
 	var encoderInterval = 0;
 	var encNo = 0;
 	var lastError = 0;
@@ -39,17 +41,18 @@ var motor = function(tessel, emitter){
 	var lineFree = true;
 	var moving = false; //Moving forward
 	var turning = false; //Turning
+	var turnTo = 0;
 
 	//...
 
-	self.masterSpeed = 20; //Master speed
+	self.masterSpeed = 10; //Master speed
 	self.speed = self.masterSpeed; //Will be changed according to front wall
 
 	self.leftCount = 0;
 	self.rightCount = 0;
 	self.odo = 0;
 	//2000 counts == 60cm
-	self.driveGoal = 2000;
+	self.driveGoal = 3000;
 	console.log('ODO', self.odo); //TODO: Remove
 
 	//Moving commands
@@ -66,40 +69,37 @@ var motor = function(tessel, emitter){
 
 	self.walls = {left: null, right: null, front: null};
 
-	process.on('uart-receive', function(port, data){
-	//uart.on('data', function(data){
-		led.toggle();
-		if(data.readInt16LE(0) == 69){
-			if(encNo > 2){ //First encoder reading contains legacy values, ingore those
-				if(moving){
+	process.on('uart-receive', function(port, data) {
+
+		if(data.readInt16LE(0) == 69) {
+			if(encNo > 2) { //First encoder reading contains legacy values, ingore those
+				if(moving) {
 					lineFree = true;
 					self.leftCount = -data.readInt16LE(2);
 					self.rightCount = data.readInt16LE(4);
 					self.odo = Math.round((-data.readInt16LE(2) + data.readInt16LE(4)) / 2);
-					if(self.odo >= self.driveGoal){
-						console.log(self.odo, self.driveGoal); //TODO: Remove
-						timeStart = new Date().getTime();
-						console.log('stop'); //TODO: Remove
-						process.nextTick(self.stopMoving());
-					} else{
+					if(self.odo >= self.driveGoal) {
+						console.log(self.odo); //TODO: Remove
+						setImmediate(self.stopMoving());
+					} else {
 						self.adjustMotors();
 					}
-				} else if(turning){
+				} else if(turning) {
 					lineFree = true;
 					self.leftCount = -data.readInt16LE(2);
 					self.rightCount = data.readInt16LE(4);
 
 					checkTurn();
 				}
-			} else{
+			} else {
 				encNo++;
 				lineFree = true;
 			}
 		}
 	});
 
-	self.setSpeeds = function(left, right){
-		process.binding('hw').uart_send(uart, new Buffer([bothForward, left, right]));
+	self.setSpeeds = function(left, right) {
+		sendSerial(uart, new Buffer([bothForward, left, right]));
 		lineFree = true;
 	};
 
@@ -107,9 +107,9 @@ var motor = function(tessel, emitter){
 	 * Slow down if wall ahead is detected
 	 * @param walls
 	 */
-	function calculateSpeedcoef(walls){
+	function calculateSpeedcoef(walls) {
 		var adjust = Math.floor(Math.sqrt(14.3 * walls.front - 720));
-		if(moving){
+		if(moving) {
 			self.speed = (isNaN(adjust)) ? 20 : self.masterSpeed - (self.masterSpeed / 100 * adjust);
 		}
 	}
@@ -118,56 +118,58 @@ var motor = function(tessel, emitter){
 	 * Starting moving forward
 	 */
 
-	self.startEncoders = function(){
-		encoderInterval = setInterval(function(){
-			self.readWalls(function(walls){
-				calculateSpeedcoef(walls);
-				if(walls.front > 750 && moving){
-					process.nextTick(self.stopMoving());
-				}
-				if(lineFree){
+	self.startEncoders = function() {
+		encoderInterval = setInterval(function() {
+			self.readWalls(function(walls) {
+				//calculateSpeedcoef(walls);
+				//if(walls.front > 750 && moving) {
+				//	process.nextTick(self.stopMoving());
+				//}
+				if(lineFree) {
 					lineFree = false;
 					uart.write(new Buffer([0xB8]));
 				}
 			});
 
-		}, 9);
+		}, 310);
 	};
 
-	self.adjustMotors = function(){
-		//Tune these to improve pid
-		Kp = 0;
-		Ki = 0;
-		Kd = 0;
+	self.adjustMotors = function() {
+		led.toggle();
+		self.readWalls(function(walls) {
+			if(walls.left < 800 && walls.right < 800) {
+				Kp = 0.0001;
+				Ki = 0.000;
+				Kd = 0.00;
 
-		var diff = self.leftCount - self.rightCount;
-		var speedLeft = self.speed;
-		var speedRight = self.speed;
+				var diff = walls.left - walls.right;
+				var speedLeft = self.speed;
+				var speedRight = self.speed;
 
-		totalError += diff;
-		var dError = diff - lastError;
+				totalError += diff;
+				var dError = diff - lastError;
 
-		var adjust = Kp * diff + Ki * totalError + Kd * dError;
+				var adjust = Kp * diff + Ki * totalError + Kd * dError;
 
-		speedLeft += Math.floor(adjust);
-		speedRight -= Math.floor(adjust);
+				speedLeft += Math.floor(adjust);
+				speedRight -= Math.floor(adjust);
 
-		self.setSpeeds(speedLeft, speedRight);
-		self.lastError = diff;
-		//console.log(diff, adjust, speedLeft, speedRight, totalError, dError, self.leftCount, self.rightCount); //TODO: Remove
+				self.setSpeeds(speedLeft, speedRight);
+				self.lastError = diff;
+				console.log(diff, adjust, speedLeft, speedRight, totalError, dError, walls.left, walls.right); //TODO: Remove
+			}else{
+				self.setSpeeds(self.masterSpeed, self.masterSpeed);
+			}
 
-		self.leftCount = 0;
-		self.rightCount = 0;
-
+		});
 	};
-	self.startMoving = function(){
-		self.odo=0;
+	self.startMoving = function() {
+		self.odo = 0;
 		moving = true;
 		lineFree = true;
-		self.startEncoders()
-
+		self.startEncoders();
 	};
-	self.stopMoving = function(){
+	self.stopMoving = function() {
 		moving = false;
 		clearInterval(encoderInterval);
 
@@ -179,8 +181,8 @@ var motor = function(tessel, emitter){
 	var leftGoal = 0;
 	var rightGoal = 0;
 
-	var checkTurn = function(){
-		if(self.leftCount >= leftGoal || self.rightCount >= rightGoal){
+	var checkTurn = function() {
+		if(self.leftCount >= leftGoal || self.rightCount >= rightGoal) {
 			turning = false;
 			self.setSpeeds(0, 0);
 			clearInterval(encoderInterval);
@@ -193,7 +195,7 @@ var motor = function(tessel, emitter){
 		lineFree = true;
 	};
 
-	self.turn = function(where){
+	self.turn = function() {
 		encNo = 0;
 		turning = true;
 		//TODO: Implement code here
@@ -204,40 +206,15 @@ var motor = function(tessel, emitter){
 		//For a 90deg, we need 256 odo ticks
 		//NB based on calculations, actual may be different
 
-		self.turnTo = function(leftCommand, rightCommand, numberOfCounts){
-			leftGoal = numberOfCounts;
-			rightGoal = numberOfCounts;
-			var turnSpeed = 10;
-			self.leftCount = 0;
-			self.rightCount = 0;
-			self.startEncoders();
-			uart.write(new Buffer([leftCommand, turnSpeed]));
-			uart.write(new Buffer([rightCommand, turnSpeed]));
-		};
-
-		var direction = main.currDir;
-		var amount = direction - where;
-		var ninetyDegreeClicks = 241;
-
-		if(amount == 1 || amount == -3){
-			self.turnTo(leftBackwards, rightForward, ninetyDegreeClicks);
-		} else if(amount == -1 || amount == 3){
-			self.turnTo(leftForward, rightBackwards, ninetyDegreeClicks);
-		} else if(amount == -2 || amount == 2){
-			self.turnTo(leftForward, rightBackwards, 2 * ninetyDegreeClicks);
-		}
-
-		main.setDir(where);
-
 	};
 
-	self.readWalls = function(callback){
+	self.readWalls = function(callback) {
 
 		var left = 0;
 		var right = 0;
 		var front = 0;
 		var num = 2;
-		for(var i = 0; i < num; i++){
+		for(var i = 0; i < num; i++) {
 			left += leftSens.read();
 			right += rightSens.read();
 			front += frontSens.read()

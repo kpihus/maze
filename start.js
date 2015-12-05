@@ -156,13 +156,6 @@ emitter.on('moving_done', function(){
 	}
 });
 
-emitter.on('start', function(){
-
-});
-
-emitter.on('all_done', function(){
-
-});
 
 
 emitter.on('test_drive', function(){
@@ -192,5 +185,58 @@ if(isTessel){
 	});
 } else{
 	emitter.emit('start');
+}
+
+
+
+
+
+//new event logic
+
+emitter.on('start_solving', function(){
+ brain.calc(function(res){
+	 if(res){
+		 if(cl[0] < X / 2 - 1 || cl[0] > X / 2 || cl [1] < X / 2 - 1 || cl[1] > X / 2){
+			 emitter.emit('turn', function(where){
+
+			 });
+		 }else{
+			 //All done, start again
+		 }
+	 }
+ });
+});
+
+emitter.on('calc', function(){
+	brain.calc(function(res){
+		if(res){
+			if(go.turnTo>0){
+				go.turn();
+			}else{
+				emit.emit('move_forward');
+			}
+		}
+	});
+});
+
+emitter.on('move_forward', function(){
+	go.startMoving();
+});
+
+emitter.on('turn_done', function(){
+
+});
+
+
+
+
+
+if(isTessel){
+	tessel.button.on('press', function(){
+		emitter.emit('move_forward');
+	});
+
+}else{
+
 }
 

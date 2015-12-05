@@ -15,22 +15,15 @@ setInterval(function(){
 		front+= frontSens.read()
 	}
 
+
 	var dist = {
-		left: Math.floor(left/num*1000),
-		front: Math.floor(front/num*1000),
-		right: Math.floor(right/num*1000)
+		left: 1000-Math.floor(left/num*1000),
+		front: 1000-Math.floor(front/num*1000),
+		right: 1000-Math.floor(right/num*1000)
 	};
 
-var coef = map(50, 750, 0, 100, dist.front);
-
-
-	console.log(dist.front, coef); //TODO: Remove
+	console.log(JSON.stringify(dist)); //TODO: Remove
 },100);
 
-function map(inmin, inmax, outmin, outmax, value){
-	var coef = Math.floor((value - inmin) * (outmax - outmin) / (inmax - inmin) + outmin);
-	coef = (coef<outmin) ? outmin : coef;
-	coef = (coef>outmax) ? outmax : coef;
-	return coef;
-}
+
 
