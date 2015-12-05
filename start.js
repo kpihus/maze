@@ -72,44 +72,6 @@ exports.setCl = function(r, c){
 /*
  I know it's an ugly function, make it better if you can :)
  */
-function initialMaze(){
-	maze = [];
-	var count = 1;
-	var r2 = 0;
-	var c2 = 0;
-	for(var r = 0; r < X; r++){
-		maze.push([]);
-		for(var c = 0; c < Y; c++){
-			var dist = 0;
-			if(r < Y / 2){
-				if(c < X / 2){
-					dist = ((X - 2) - c) - r;
-				} else{
-					dist = (c - 1) - r;
-				}
-			} else{
-				if(c < X / 2){
-					dist = ((r - 1) - c);
-				} else{
-					dist = c2 + r2;
-					c2++;
-					if(c2 > 7){
-						c2 = 0;
-						r2++;
-					}
-				}
-			}
-			var newCell = clone(cell);
-			newCell.nr = count++;
-			newCell.dist = dist;
-			maze[r].push(newCell);
-
-		}//<- end of cell loop
-
-	}
-
-	exports.maze = maze;
-}
 
 function printMaze(maze, dir){
 	process.stdout.write('\033c');
@@ -205,6 +167,7 @@ emitter.on('all_done', function(){
 
 emitter.on('test_drive', function(){
 	go.startMoving();
+	//go.turn(1);
 });
 
 emitter.on('stop_moving', function(){

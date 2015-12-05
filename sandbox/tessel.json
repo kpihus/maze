@@ -1,0 +1,124 @@
+{
+  "I2CMode": {
+    "General": 2,
+    "Master": 0,
+    "Slave": 1
+  },
+  "SPIDataMode": {},
+  "ports": {
+    "B": {
+      "analog": [],
+      "id": "B",
+      "digital": [
+        {
+          "pin": 19,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        {
+          "pin": 20,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        {
+          "pin": 21,
+          "isPWM": false,
+          "interrupts": {}
+        }
+      ],
+      "pin": {
+        "G3": {
+          "pin": 21,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        "G1": {
+          "pin": 19,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        "G2": {
+          "pin": 20,
+          "isPWM": false,
+          "interrupts": {}
+        }
+      },
+      "pwm": []
+    },
+    "D": {
+      "analog": [],
+      "id": "D",
+      "digital": [
+        {
+          "pin": 25,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        {
+          "pin": 26,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        {
+          "pin": 27,
+          "isPWM": false,
+          "interrupts": {}
+        }
+      ],
+      "pin": {
+        "G3": {
+          "pin": 27,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        "G1": {
+          "pin": 25,
+          "isPWM": false,
+          "interrupts": {}
+        },
+        "G2": {
+          "pin": 26,
+          "isPWM": false,
+          "interrupts": {}
+        }
+      },
+      "pwm": []
+    },
+    "GPIO": {
+      "analog": [
+        {
+          "pin": 28,
+          "isPWM": false,
+          "pinmode": "input"
+        },
+        {
+          "pin": 29,
+          "isPWM": false,
+          "pinmode": "input"
+        },
+        {
+          "pin": 30,
+          "isPWM": false,
+          "pinmode": "input"
+        },
+        {
+          "pin": 31,
+          "isPWM": false,
+          "pinmode": "input"
+        },
+        {
+          "pin": 32,
+          "isPWM": false,
+          "pinmode": "input"
+        },
+        {
+          "pin": 33,
+          "isPWM": false,
+          "pinmode": "input"
+        }
+      ],
+      "id": "GPIO",
+      "digital": [
+        {
+          "pin": 34,
+          "isPWM
