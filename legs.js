@@ -1,12 +1,5 @@
-var main = require('./start.js');
 var testMaze = require('./testMaze.json');
-var cl = main.cl;
-var currDir = main.currDir;
-var isTessel = main.isTessel;
-var curWalls = main.curWalls;
-var speed = 20;
-var leftCount = 0;
-var rightCount = 0;
+
 exports.testMaze = testMaze;
 
 var motor = function(tessel, emitter) {
@@ -33,6 +26,9 @@ var motor = function(tessel, emitter) {
 	//Clear encoders in 3pi
 	uart.write(new Buffer([0xB7]));
 
+	self.curDir = 0;
+	self.curLoc = [15, 0];
+
 	//Inhouse usage variables
 	var encoderInterval = 0;
 	var encNo = 0;
@@ -41,19 +37,19 @@ var motor = function(tessel, emitter) {
 	var lineFree = true;
 	var moving = false; //Moving forward
 	var turning = false; //Turning
-	var turnTo = 0;
+	self.turnTo = 0;
+	var waitingForTurn = false;
+	var inCalcMode = false;
 
 	//...
 
-	self.masterSpeed = 10; //Master speed
+	self.masterSpeed = 20; //Master speed
 	self.speed = self.masterSpeed; //Will be changed according to front wall
 
 	self.leftCount = 0;
 	self.rightCount = 0;
 	self.odo = 0;
-	//2000 counts == 60cm
 	self.driveGoal = 3000;
-	console.log('ODO', self.odo); //TODO: Remove
 
 	//Moving commands
 	var rightForward = 0xC6;
@@ -62,6 +58,7 @@ var motor = function(tessel, emitter) {
 	var leftBackwards = 0xC1;
 	var bothForward = 0xC8;
 	var bothBackwards = 0xC7;
+	var turnRobot = 0xC9;
 	var timeStart, timeEnd;
 
 	self.rightEnc = tessel.port['A'].digital[0];
@@ -69,27 +66,51 @@ var motor = function(tessel, emitter) {
 
 	self.walls = {left: null, right: null, front: null};
 
-	process.on('uart-receive', function(port, data) {
+	var updateLocation = function() {
+		switch(self.curDir) {
+			case 0:
+				self.curLoc[0] = self.curLoc[0] - 1;
+				break;
+			case 1:
+				self.curLoc[1] = self.curLoc[1] + 1;
+				break;
+			case 2:
+				self.curLoc[0] = self.curLoc[0] + 1;
+				break;
+			case 3:
+				self.curLoc[1] = self.curLoc[1] - 1;
+				break;
+
+		}
+
+	};
+
+	//process.on('uart-receive', function(port, data) {
+		uart.on('data', function(data){
+
 
 		if(data.readInt16LE(0) == 69) {
 			if(encNo > 2) { //First encoder reading contains legacy values, ingore those
 				if(moving) {
 					lineFree = true;
-					self.leftCount = -data.readInt16LE(2);
-					self.rightCount = data.readInt16LE(4);
-					self.odo = Math.round((-data.readInt16LE(2) + data.readInt16LE(4)) / 2);
-					if(self.odo >= self.driveGoal) {
-						console.log(self.odo); //TODO: Remove
-						setImmediate(self.stopMoving());
-					} else {
-						self.adjustMotors();
+					self.leftCount += -data.readInt16LE(2);
+					self.rightCount += data.readInt16LE(4);
+					self.odo += Math.round((-data.readInt16LE(2) + data.readInt16LE(4)) / 2);
+					if(self.odo > 611) {
+						inCalcMode = false;
+						self.odo = 0;
+						if(waitingForTurn) {
+							waitingForTurn = false;
+							self.stopMoving();
+							emitter.emit('make_turn');
+						}
 					}
-				} else if(turning) {
-					lineFree = true;
-					self.leftCount = -data.readInt16LE(2);
-					self.rightCount = data.readInt16LE(4);
+					if(self.odo > 324 && !inCalcMode) { //360 == 90mm
+						updateLocation();
+						inCalcMode = true;
+						emitter.emit('calc');
+					}
 
-					checkTurn();
 				}
 			} else {
 				encNo++;
@@ -120,29 +141,40 @@ var motor = function(tessel, emitter) {
 
 	self.startEncoders = function() {
 		encoderInterval = setInterval(function() {
+			led.toggle();
 			self.readWalls(function(walls) {
+				self.walls = walls;
+				if(moving) {
+					self.adjustMotors();
+				}
 				//calculateSpeedcoef(walls);
-				//if(walls.front > 750 && moving) {
-				//	process.nextTick(self.stopMoving());
-				//}
+				if(walls.front < 620 && moving) {
+					self.stopMoving();
+					emitter.emit('calc');
+					setTimeout(function(){
+						waitingForTurn = false;
+						emitter.emit('make_turn');
+					},500);
+
+				}
 				if(lineFree) {
 					lineFree = false;
-					uart.write(new Buffer([0xB8]));
+					uart.write(new Buffer([0xB7]));
 				}
 			});
 
-		}, 310);
+		}, 31);
 	};
 
 	self.adjustMotors = function() {
-		led.toggle();
+
 		self.readWalls(function(walls) {
 			if(walls.left < 800 && walls.right < 800) {
-				Kp = 0.0001;
-				Ki = 0.000;
-				Kd = 0.00;
+				Kp = 10;
+				Ki = 0.2;
+				Kd = 3;
 
-				var diff = walls.left - walls.right;
+				var diff = (walls.left - walls.right) / (walls.left + walls.right);
 				var speedLeft = self.speed;
 				var speedRight = self.speed;
 
@@ -150,62 +182,49 @@ var motor = function(tessel, emitter) {
 				var dError = diff - lastError;
 
 				var adjust = Kp * diff + Ki * totalError + Kd * dError;
-
-				speedLeft += Math.floor(adjust);
-				speedRight -= Math.floor(adjust);
+				if(adjust >= 0) {
+					speedLeft -= Math.ceil(adjust);
+					speedRight += Math.ceil(adjust);
+				}
+				else {
+					speedLeft -= Math.floor(adjust);
+					speedRight += Math.floor(adjust);
+				}
 
 				self.setSpeeds(speedLeft, speedRight);
 				self.lastError = diff;
-				console.log(diff, adjust, speedLeft, speedRight, totalError, dError, walls.left, walls.right); //TODO: Remove
-			}else{
+				//console.log(diff, adjust, speedLeft, speedRight, totalError, dError, walls.left, walls.right); //TODO: Remove
+			} else {
 				self.setSpeeds(self.masterSpeed, self.masterSpeed);
 			}
-
 		});
 	};
 	self.startMoving = function() {
 		self.odo = 0;
 		moving = true;
 		lineFree = true;
-		self.startEncoders();
 	};
 	self.stopMoving = function() {
 		moving = false;
-		clearInterval(encoderInterval);
-
 		self.setSpeeds(0, 0);
 		self.speed = self.masterSpeed;
 	};
 
-	//Turn handling
-	var leftGoal = 0;
-	var rightGoal = 0;
-
-	var checkTurn = function() {
-		if(self.leftCount >= leftGoal || self.rightCount >= rightGoal) {
-			turning = false;
-			self.setSpeeds(0, 0);
-			clearInterval(encoderInterval);
-			console.log('CheckTurn', leftGoal, self.leftCount, rightGoal, self.rightCount); //TODO: Remove
-
-			self.leftCount = 0;
-			self.rightCount = 0;
-
-		}
-		lineFree = true;
-	};
-
-	self.turn = function() {
+	self.turn = function(where) {
 		encNo = 0;
 		turning = true;
-		//TODO: Implement code here
-		//One wheel rotation == 360 encoder counts
-		//For a 360deg turn, wheel has to drive 283mm
-		//For a 90deg turn, wheel has to drive 71mm
-		//One wheel rotation is 100mm
-		//For a 90deg, we need 256 odo ticks
-		//NB based on calculations, actual may be different
-
+		waitingForTurn = true;
+		emitter.once('make_turn', function() {
+			lineFree = false;
+			sendSerial(uart, new Buffer([turnRobot, where]));
+			setTimeout(function(){
+				lineFree = true;
+				emitter.emit('turn_done');
+			},2000);
+		});
+		emitter.once('turn_done', function() {
+			self.curDir = (self.curDir + where) % 4;
+		})
 	};
 
 	self.readWalls = function(callback) {
@@ -220,82 +239,15 @@ var motor = function(tessel, emitter) {
 			front += frontSens.read()
 		}
 		callback({
-			left: Math.floor(left / num * 1000),
-			front: Math.floor(front / num * 1000),
-			right: Math.floor(right / num * 1000)
+			left: 1000 - Math.floor(left / num * 1000),
+			front: 1000 - Math.floor(front / num * 1000),
+			right: 1000 - Math.floor(right / num * 1000)
 		});
 
 	};
 
+	self.startEncoders();
+
 };
 
 exports.motor = motor;
-
-//emitter.on('stop_moving', stop());
-
-/*
- Moves forward by one cell
- And updates current location
- */
-//emitter.on('move_forward', function moveForward(){
-//	//TODO: add moving control here
-//
-//	switch(main.getDir()){
-//		case 0:
-//			cl[0] = cl[0] - 1;
-//			break;
-//		case 1:
-//			cl[1] = cl[1] + 1;
-//			break;
-//		case 2:
-//			cl[0] = cl[0] + 1;
-//			break;
-//		case 3:
-//			cl[1] = cl[1] - 1;
-//			break;
-//	}
-//
-//	if(!isTessel){
-//		//Dummy timeout to emulate moving for now
-//		setTimeout(function(){
-//			emitter.emit('moving_done');
-//		}, 50);
-//	} else{
-//		emitter.emit('moving_done');
-//	}
-//});
-
-//emitter.on('check_walls', function(){
-//	//TODO: dummy for now, data is taken from test Maze
-//	var item = testMaze[cl[0]][cl[1]];
-//	curWalls.north = item.north;
-//	curWalls.south = item.south;
-//	curWalls.east = item.east;
-//	curWalls.west = item.west;
-//
-//	//TODO: emulate timeout for now
-//	setTimeout(function(){
-//		emitter.emit('check_walls_done');
-//	}, 100);
-//
-//});
-
-/*
- where: [
- 0: north,
- 1: east,
- 2: south,
- 3: west
- ]
- */
-//emitter.on('turn', function turn(where){
-//	var amount = (where - currDir) * 90;
-//	//TODO: add turning control here
-//	main.setDir(where);
-//	setTimeout(function(){
-//		emitter.emit('turn_done');
-//	}, 50);
-//
-//});
-
-
