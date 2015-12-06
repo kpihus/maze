@@ -1,11 +1,13 @@
+var main = require('./start');
 var whereTo = 0;
 var path = [];
 
 var brain = function(emitter) {
+	var testMaze = require('./testMaze2.json');
 	var self = this;
+	self.testMode = false;
 	var go;
 	var maze = [];
-	var cl = [15, 0];
 	var X = 16;
 	var Y = 16;
 	var steps = 0;
@@ -83,7 +85,7 @@ var brain = function(emitter) {
 				case 1:
 					walls = {
 						east: (walldist.front < 890),
-						nort: (walldist.left < 800),
+						north: (walldist.left < 800),
 						south: (walldist.right < 800),
 						west: false
 					};
@@ -107,6 +109,8 @@ var brain = function(emitter) {
 					break;
 			}
 
+
+			console.log(walls); //TODO: Remove
 			var cl = go.curLoc;
 			maze[cl[0]][cl[1]].north = walls.north;
 			if(cl[0] > 0) maze[cl[0] - 1][cl[1]].south = walls.north;
@@ -160,7 +164,7 @@ var brain = function(emitter) {
 					wall = maze[location[0]][location[1]].west;
 					break;
 			}
-			//console.log(wall);
+			//main.log(wall);
 			if((neighbours[i].dist <= bestNeighbour.dist) && (wall == false)) {
 				if(decideWhereTo) {
 					whereTo = i;
@@ -217,14 +221,63 @@ var brain = function(emitter) {
 	};
 
 	self.calc = function(callback) {
+		main.log('do calc'); //TODO: Remove
 		checkWalls(function(res) {
 			if(res) {
 				updateCells(function(res) {
+					//printMaze(maze, go.curDir);
 					callback(res);
 				})
 			}
 		});
 	};
+
+	function printMaze(maze, dir) {
+		var cl = go.curLoc;
+		process.stdout.write('\033c');
+		console.log(cl); //TODO: Remove
+//var footrow="";
+		for(var r = 0; r < maze.length; r++) {
+			var row = maze[r];
+			var headStr = "";
+			var rowStr = "";
+			var footrow = "";
+			for(var c = 0; c < row.length; c++) {
+				var here = " ";
+				if(cl[0] == r && cl[1] == c) {
+					switch(dir) {
+						case 0:
+							here = "^";
+							break;
+						case 2:
+							here = "v";
+							break;
+						case 1:
+							here = ">";
+							break;
+						case 3:
+							here = "<";
+							break;
+					}
+				}
+
+				footrow += "+----";
+				if(r == 0) {
+					headStr += "+----";
+				} else {
+					headStr += (row[c].north == true && maze[r - 1][c].south == true) ? "+----" : "+    ";
+				}
+				rowStr += (c == 0) ? "|" : "";
+				rowStr += (row[c].dist > 9) ? here : " " + here;
+				rowStr += row[c].dist;
+				rowStr += (row[c].east == true && row[c + 1].west == true ) ? " |" : "  ";
+				rowStr += (c == row.length - 1) ? "|" : "";
+			}
+			console.log(headStr + '+');
+			console.log(rowStr);
+		}
+		console.log(footrow + '+');
+	}
 
 };
 

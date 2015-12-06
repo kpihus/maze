@@ -1,13 +1,13 @@
-var testMaze = require('./testMaze.json');
+var main = require('./start');
 
-exports.testMaze = testMaze;
 
 var motor = function(tessel, emitter) {
 	var self = this;
-	var maze;
-	self.setMaze = function(m) {
-		maze = m;
+	var brain;
+	self.setBrain = function(m) {
+		brain = m;
 	};
+	self.testMode = false;
 	//Hardware variables
 	var led = tessel.led[0];
 	var port = tessel.port['D'];
@@ -16,7 +16,7 @@ var motor = function(tessel, emitter) {
 	var frontSens = gpio.analog[4];
 	var rightSens = gpio.analog[5];
 	var uart = new port.UART({
-		baudrate: 250000
+		baudrate: 115200
 	});
 
 	var sendSerial = process.binding('hw').uart_send;
@@ -25,6 +25,7 @@ var motor = function(tessel, emitter) {
 	uart.write(new Buffer([0x81]));
 	//Clear encoders in 3pi
 	uart.write(new Buffer([0xB7]));
+	uart.write(new Buffer([0xB3, 1, 0x45]));
 
 	self.curDir = 0;
 	self.curLoc = [15, 0];
@@ -40,6 +41,7 @@ var motor = function(tessel, emitter) {
 	self.turnTo = 0;
 	var waitingForTurn = false;
 	var inCalcMode = false;
+	var tempBuffer = [];
 
 	//...
 
@@ -48,7 +50,7 @@ var motor = function(tessel, emitter) {
 
 	self.leftCount = 0;
 	self.rightCount = 0;
-	self.odo = 0;
+	self.odo = 613;
 	self.driveGoal = 3000;
 
 	//Moving commands
@@ -65,6 +67,11 @@ var motor = function(tessel, emitter) {
 	self.leftEnc = tessel.port['C'].digital[0];
 
 	self.walls = {left: null, right: null, front: null};
+
+	self.setSpeeds = function(left, right) {
+		sendSerial(uart, new Buffer([bothForward, left, right]));
+		lineFree = true;
+	};
 
 	var updateLocation = function() {
 		switch(self.curDir) {
@@ -85,20 +92,33 @@ var motor = function(tessel, emitter) {
 
 	};
 
-	//process.on('uart-receive', function(port, data) {
-		uart.on('data', function(data){
+	function handleBuffer(buffArr){
 
+		var data = new Buffer(buffArr);
+		var cmd = 0;
+		try{
+			cmd = data.readInt16LE(0);
+		}catch (e){
+			//Strange buffer, do nothing
+		}
+		if(cmd == 69){
+			self.leftCount += -data.readInt16LE(2);
+			self.rightCount += data.readInt16LE(4);
+		}
 
-		if(data.readInt16LE(0) == 69) {
+		if(cmd == 69) {
 			if(encNo > 2) { //First encoder reading contains legacy values, ingore those
 				if(moving) {
 					lineFree = true;
-					self.leftCount += -data.readInt16LE(2);
-					self.rightCount += data.readInt16LE(4);
-					self.odo += Math.round((-data.readInt16LE(2) + data.readInt16LE(4)) / 2);
-					if(self.odo > 611) {
-						inCalcMode = false;
+
+					self.odo += Math.round((self.leftCount + self.rightCount) / 2);
+					if(self.odo > 612) {
 						self.odo = 0;
+						self.leftCount =0;
+						self.rightCount = 0;
+
+						inCalcMode = false;
+
 						if(waitingForTurn) {
 							waitingForTurn = false;
 							self.stopMoving();
@@ -117,12 +137,34 @@ var motor = function(tessel, emitter) {
 				lineFree = true;
 			}
 		}
+	}
+
+	//process.on('uart-receive', function(port, data) {
+	uart.on('data', function(data) {
+
+		if(data[0]==69 && tempBuffer.length == 0 || tempBuffer.length >0) {
+			for(var i = 0; i < data.length; i++) {
+				tempBuffer.push(data[i]);
+			}
+
+			if(tempBuffer.length > 6) {
+				handleBuffer(tempBuffer.slice(0,6));
+				tempBuffer=[];
+			}
+		}
+
+
+
+		//var cmd = 0;
+		//try{
+		//	cmd = data.readInt16LE(0);
+		//}catch (e){
+		//	//Strange buffer, do nothing
+		//}
+
 	});
 
-	self.setSpeeds = function(left, right) {
-		sendSerial(uart, new Buffer([bothForward, left, right]));
-		lineFree = true;
-	};
+
 
 	/**
 	 * Slow down if wall ahead is detected
@@ -151,22 +193,29 @@ var motor = function(tessel, emitter) {
 				if(walls.front < 620 && moving) {
 					self.stopMoving();
 					emitter.emit('calc');
-					setTimeout(function(){
+					setTimeout(function() {
 						waitingForTurn = false;
 						emitter.emit('make_turn');
-					},500);
+					}, 500);
 
 				}
 				if(lineFree) {
 					lineFree = false;
-					uart.write(new Buffer([0xB7]));
+					sendSerial(uart, new Buffer([0xB7]));
+				}
+				if(!moving && self.turnTo > 0){
+					emitter.emit('make_turn');
 				}
 			});
 
-		}, 31);
+		}, 90);
 	};
 
 	self.adjustMotors = function() {
+		if(self.testMode){
+			self.setSpeeds(self.masterSpeed, self.masterSpeed);
+			return;
+		}
 
 		self.readWalls(function(walls) {
 			if(walls.left < 800 && walls.right < 800) {
@@ -193,7 +242,7 @@ var motor = function(tessel, emitter) {
 
 				self.setSpeeds(speedLeft, speedRight);
 				self.lastError = diff;
-				//console.log(diff, adjust, speedLeft, speedRight, totalError, dError, walls.left, walls.right); //TODO: Remove
+				//main.log(diff, adjust, speedLeft, speedRight, totalError, dError, walls.left, walls.right); //TODO: Remove
 			} else {
 				self.setSpeeds(self.masterSpeed, self.masterSpeed);
 			}
@@ -215,20 +264,26 @@ var motor = function(tessel, emitter) {
 		turning = true;
 		waitingForTurn = true;
 		emitter.once('make_turn', function() {
+			moving = false;
 			lineFree = false;
-			sendSerial(uart, new Buffer([turnRobot, where]));
-			setTimeout(function(){
-				lineFree = true;
-				emitter.emit('turn_done');
-			},2000);
+			setTimeout(function() {
+				sendSerial(uart, new Buffer([turnRobot, where]));
+				setTimeout(function() {
+					lineFree = true;
+					turing = false;
+					lastError = 0;
+					totalError = 0;
+					emitter.emit('turn_done');
+				}, 1000);
+			}, 500);
 		});
 		emitter.once('turn_done', function() {
+
 			self.curDir = (self.curDir + where) % 4;
 		})
 	};
 
 	self.readWalls = function(callback) {
-
 		var left = 0;
 		var right = 0;
 		var front = 0;

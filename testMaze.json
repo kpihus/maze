@@ -270,7 +270,7 @@
     {      "nr": 240,      "dist": 13,      "north": true,      "south": false,      "east": false,      "west": false    }
   ],
   [
-    {      "nr": 241,      "dist": 14,      "north": false,      "south": false,      "east": true,      "west": false    },
+    {      "nr": 241,      "dist": 14,      "north": false,      "south": false,      "east": true,      "west": true    },
     {      "nr": 242,      "dist": 13,      "north": false,      "south": false,      "east": true,      "west": true    },
     {      "nr": 243,      "dist": 12,      "north": false,      "south": false,      "east": true,      "west": true    },
     {      "nr": 244,      "dist": 11,      "north": false,      "south": false,      "east": false,      "west": true    },
